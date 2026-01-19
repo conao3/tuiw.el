@@ -132,7 +132,8 @@ If NO-COLOR is non-nil, strip ANSI color codes."
       (let ((inhibit-read-only t))
         (erase-buffer)
         (insert (tuiw--view session-id t))
-        (goto-char (point-min))))
+        (goto-char (point-min)))
+      (special-mode))
     (display-buffer buf)))
 
 ;;;###autoload
