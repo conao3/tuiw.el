@@ -56,7 +56,7 @@
     (apply #'call-process tuiw-executable nil t nil args)
     (buffer-string)))
 
-(defun tuiw-create (command &optional cwd)
+(defun tuiw--create (command &optional cwd)
   "Create a new tuiw session running COMMAND.
 Optional CWD specifies the working directory.
 Return session ID."
@@ -65,14 +65,14 @@ Return session ID."
        (tuiw--call "create" "--cwd" cwd command)
      (tuiw--call "create" command))))
 
-(defun tuiw-send (session-id keys &optional no-newline)
+(defun tuiw--send (session-id keys &optional no-newline)
   "Send KEYS to SESSION-ID.
 If NO-NEWLINE is non-nil, do not append newline."
   (if no-newline
       (tuiw--call "send" "--no-newline" session-id keys)
     (tuiw--call "send" session-id keys)))
 
-(defun tuiw-list ()
+(defun tuiw--list ()
   "List all tuiw sessions.
 Return list of (session-id command cwd)."
   (let ((output (string-trim (tuiw--call "list"))))
@@ -80,13 +80,13 @@ Return list of (session-id command cwd)."
       (mapcar (lambda (line) (split-string line "\t"))
               (split-string output "\n")))))
 
-(defun tuiw-list-session-ids ()
+(defun tuiw--list-session-ids ()
   "List all tuiw session IDs."
-  (mapcar #'car (tuiw-list)))
+  (mapcar #'car (tuiw--list)))
 
 (defun tuiw--read-session (prompt)
   "Read a session ID with PROMPT using completion with annotations."
-  (let* ((sessions (tuiw-list))
+  (let* ((sessions (tuiw--list))
          (annotate (lambda (id)
                      (when-let ((entry (assoc id sessions)))
                        (format "  %s [%s]" (nth 1 entry) (nth 2 entry)))))
@@ -96,18 +96,18 @@ Return list of (session-id command cwd)."
                     (complete-with-action action (mapcar #'car sessions) string pred)))))
     (completing-read prompt table nil t)))
 
-(defun tuiw-view (session-id &optional no-color)
+(defun tuiw--view (session-id &optional no-color)
   "View output of SESSION-ID.
 If NO-COLOR is non-nil, strip ANSI color codes."
   (if no-color
       (tuiw--call "view" "--no-color" session-id)
     (tuiw--call "view" session-id)))
 
-(defun tuiw-status (session-id)
+(defun tuiw--status (session-id)
   "Get status of SESSION-ID."
   (string-trim (tuiw--call "status" session-id)))
 
-(defun tuiw-close (session-id)
+(defun tuiw--close (session-id)
   "Close SESSION-ID."
   (tuiw--call "close" session-id))
 
@@ -116,97 +116,97 @@ If NO-COLOR is non-nil, strip ANSI color codes."
 ;;; Interactive Commands
 
 ;;;###autoload
-(defun tuiw-run (command)
+(defun tuiw-create (command)
   "Run COMMAND in a new tuiw session interactively."
   (interactive "sCommand: ")
-  (let ((session-id (tuiw-create command)))
+  (let ((session-id (tuiw--create command)))
     (message "Created tuiw session: %s" session-id)
     session-id))
 
 ;;;###autoload
-(defun tuiw-show (session-id)
+(defun tuiw-view (session-id)
   "Show output of SESSION-ID in a buffer."
   (interactive (list (tuiw--read-session "Session: ")))
   (let ((buf (get-buffer-create (format "*tuiw:%s*" session-id))))
     (with-current-buffer buf
       (let ((inhibit-read-only t))
         (erase-buffer)
-        (insert (tuiw-view session-id t))
+        (insert (tuiw--view session-id t))
         (goto-char (point-min))))
     (display-buffer buf)))
 
 ;;;###autoload
-(defun tuiw-send-to-session (session-id keys)
+(defun tuiw-send (session-id keys)
   "Send KEYS to SESSION-ID interactively."
   (interactive
    (list (tuiw--read-session "Session: ")
          (read-string "Keys: ")))
-  (tuiw-send session-id keys)
+  (tuiw--send session-id keys)
   (message "Sent keys to %s" session-id))
 
 ;;;###autoload
-(defun tuiw-close-session (session-id)
+(defun tuiw-close (session-id)
   "Close SESSION-ID interactively."
   (interactive (list (tuiw--read-session "Session: ")))
-  (tuiw-close session-id)
+  (tuiw--close session-id)
   (message "Closed session: %s" session-id))
 
 
 ;;; Send Buffer Mode
 
-(defvar-local tuiw-send-to-session-with-temp-buffer--session-id nil)
+(defvar-local tuiw-send-with-temp-buffer--session-id nil)
 
-(defvar tuiw-send-to-session-with-temp-buffer-mode-map
+(defvar tuiw-send-with-temp-buffer-mode-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map text-mode-map)
-    (define-key map (kbd "C-c C-c") #'tuiw-send-to-session-with-temp-buffer-commit)
-    (define-key map (kbd "C-c C-k") #'tuiw-send-to-session-with-temp-buffer-cancel)
+    (define-key map (kbd "C-c C-c") #'tuiw-send-with-temp-buffer-commit)
+    (define-key map (kbd "C-c C-k") #'tuiw-send-with-temp-buffer-cancel)
     map))
 
-(define-derived-mode tuiw-send-to-session-with-temp-buffer-mode text-mode "Tuiw-Send"
+(define-derived-mode tuiw-send-with-temp-buffer-mode text-mode "Tuiw-Send"
   "Mode for composing text to send to tuiw session.
-\\<tuiw-send-to-session-with-temp-buffer-mode-map>
-\\[tuiw-send-to-session-with-temp-buffer-commit] to send, \\[tuiw-send-to-session-with-temp-buffer-cancel] to cancel.")
+\\<tuiw-send-with-temp-buffer-mode-map>
+\\[tuiw-send-with-temp-buffer-commit] to send, \\[tuiw-send-with-temp-buffer-cancel] to cancel.")
 
-(defun tuiw-send-to-session-with-temp-buffer-commit ()
+(defun tuiw-send-with-temp-buffer-commit ()
   "Send buffer contents to the tuiw session."
   (interactive)
   (let ((content (buffer-string))
-        (session-id tuiw-send-to-session-with-temp-buffer--session-id))
-    (tuiw-send session-id content t)
+        (session-id tuiw-send-with-temp-buffer--session-id))
+    (tuiw--send session-id content t)
     (message "Sent to %s" session-id)
     (quit-window t)))
 
-(defun tuiw-send-to-session-with-temp-buffer-cancel ()
+(defun tuiw-send-with-temp-buffer-cancel ()
   "Cancel sending and close the buffer."
   (interactive)
   (quit-window t))
 
 ;;;###autoload
-(defun tuiw-send-to-session-with-temp-buffer (session-id)
+(defun tuiw-send-with-temp-buffer (session-id)
   "Open a buffer to compose text to send to SESSION-ID."
   (interactive (list (tuiw--read-session "Session: ")))
-  (let ((buf (get-buffer-create (format "*tuiw-send:%s*" session-id))))
+  (let ((buf (get-buffer-create (format "*tuiw--send:%s*" session-id))))
     (with-current-buffer buf
-      (tuiw-send-to-session-with-temp-buffer-mode)
-      (setq tuiw-send-to-session-with-temp-buffer--session-id session-id)
+      (tuiw-send-with-temp-buffer-mode)
+      (setq tuiw-send-with-temp-buffer--session-id session-id)
       (erase-buffer))
     (pop-to-buffer buf)))
 
 
 ;;; List Session Mode
 
-(defvar tuiw-list-session-mode-map
+(defvar tuiw-list-mode-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map tabulated-list-mode-map)
-    (define-key map (kbd "RET") #'tuiw-list-session-show)
-    (define-key map (kbd "s") #'tuiw-list-session-send)
-    (define-key map (kbd "d") #'tuiw-list-session-close)
-    (define-key map (kbd "g") #'tuiw-list-session-refresh)
-    (define-key map (kbd "a") #'tuiw-list-session-attach)
+    (define-key map (kbd "RET") #'tuiw-list-show)
+    (define-key map (kbd "s") #'tuiw-list-send)
+    (define-key map (kbd "d") #'tuiw-list-close)
+    (define-key map (kbd "g") #'tuiw-list-refresh)
+    (define-key map (kbd "a") #'tuiw-list-attach)
     map))
 
-(define-derived-mode tuiw-list-session-mode tabulated-list-mode "Tuiw-List"
+(define-derived-mode tuiw-list-mode tabulated-list-mode "Tuiw-List"
   "Major mode for listing tuiw sessions."
   (setq tabulated-list-format [("ID" 10 t)
                                ("Command" 40 t)
@@ -214,7 +214,7 @@ If NO-COLOR is non-nil, strip ANSI color codes."
   (setq tabulated-list-padding 2)
   (tabulated-list-init-header))
 
-(defun tuiw-list-session-refresh ()
+(defun tuiw-list-refresh ()
   "Refresh tuiw session list."
   (interactive)
   (setq tabulated-list-entries
@@ -223,47 +223,47 @@ If NO-COLOR is non-nil, strip ANSI color codes."
                         (vector (nth 0 entry)
                                 (or (nth 1 entry) "")
                                 (or (nth 2 entry) ""))))
-                (tuiw-list)))
+                (tuiw--list)))
   (tabulated-list-print t))
 
-(defun tuiw-list-session--get-id ()
+(defun tuiw-list--get-id ()
   "Get session ID at point."
   (tabulated-list-get-id))
 
-(defun tuiw-list-session-show ()
+(defun tuiw-list-show ()
   "Show output of session at point."
   (interactive)
-  (when-let ((id (tuiw-list-session--get-id)))
-    (tuiw-show id)))
+  (when-let ((id (tuiw-list--get-id)))
+    (tuiw-view id)))
 
-(defun tuiw-list-session-send (keys)
+(defun tuiw-list-send (keys)
   "Send KEYS to session at point."
   (interactive "sKeys: ")
-  (when-let ((id (tuiw-list-session--get-id)))
-    (tuiw-send id keys)
+  (when-let ((id (tuiw-list--get-id)))
+    (tuiw--send id keys)
     (message "Sent keys to %s" id)))
 
-(defun tuiw-list-session-close ()
+(defun tuiw-list-close ()
   "Close session at point."
   (interactive)
-  (when-let ((id (tuiw-list-session--get-id)))
-    (tuiw-close id)
-    (tuiw-list-session-refresh)))
+  (when-let ((id (tuiw-list--get-id)))
+    (tuiw--close id)
+    (tuiw-list-refresh)))
 
-(defun tuiw-list-session-attach ()
+(defun tuiw-list-attach ()
   "Attach to session at point using vterm."
   (interactive)
-  (when-let ((id (tuiw-list-session--get-id)))
+  (when-let ((id (tuiw-list--get-id)))
     (tuiw-attach id)))
 
 ;;;###autoload
-(defun tuiw-list-sessions ()
+(defun tuiw-list ()
   "Display tuiw sessions in a tabulated list."
   (interactive)
   (let ((buf (get-buffer-create "*tuiw-sessions*")))
     (with-current-buffer buf
-      (tuiw-list-session-mode)
-      (tuiw-list-session-refresh))
+      (tuiw-list-mode)
+      (tuiw-list-refresh))
     (pop-to-buffer buf)))
 
 
