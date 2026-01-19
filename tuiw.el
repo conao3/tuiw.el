@@ -151,6 +151,47 @@ If NO-COLOR is non-nil, strip ANSI color codes."
   (tuiw-close session-id)
   (message "Closed session: %s" session-id))
 
+
+;;; Send Buffer Mode
+
+(defvar-local tuiw-send-to-session-with-temp-buffer--session-id nil)
+
+(defvar tuiw-send-to-session-with-temp-buffer-mode-map
+  (let ((map (make-sparse-keymap)))
+    (set-keymap-parent map text-mode-map)
+    (define-key map (kbd "C-c C-c") #'tuiw-send-to-session-with-temp-buffer-commit)
+    (define-key map (kbd "C-c C-k") #'tuiw-send-to-session-with-temp-buffer-cancel)
+    map))
+
+(define-derived-mode tuiw-send-to-session-with-temp-buffer-mode text-mode "Tuiw-Send"
+  "Mode for composing text to send to tuiw session.
+\\<tuiw-send-to-session-with-temp-buffer-mode-map>
+\\[tuiw-send-to-session-with-temp-buffer-commit] to send, \\[tuiw-send-to-session-with-temp-buffer-cancel] to cancel.")
+
+(defun tuiw-send-to-session-with-temp-buffer-commit ()
+  "Send buffer contents to the tuiw session."
+  (interactive)
+  (let ((content (buffer-string))
+        (session-id tuiw-send-to-session-with-temp-buffer--session-id))
+    (tuiw-send session-id content t)
+    (message "Sent to %s" session-id)
+    (quit-window t)))
+
+(defun tuiw-send-to-session-with-temp-buffer-cancel ()
+  "Cancel sending and close the buffer."
+  (interactive)
+  (quit-window t))
+
+;;;###autoload
+(defun tuiw-send-to-session-with-temp-buffer (session-id)
+  "Open a buffer to compose text to send to SESSION-ID."
+  (interactive (list (tuiw--read-session "Session: ")))
+  (let ((buf (get-buffer-create (format "*tuiw-send:%s*" session-id))))
+    (with-current-buffer buf
+      (tuiw-send-to-session-with-temp-buffer-mode)
+      (setq tuiw-send-to-session-with-temp-buffer--session-id session-id)
+      (erase-buffer))
+    (pop-to-buffer buf)))
 
 
 ;;; List Session Mode
