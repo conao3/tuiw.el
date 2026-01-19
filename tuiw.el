@@ -41,6 +41,11 @@
   :type 'string
   :group 'tuiw)
 
+(defcustom tuiw-terminal-backend 'vterm
+  "Terminal backend for attaching to tuiw sessions."
+  :type '(choice (const :tag "vterm" vterm))
+  :group 'tuiw)
+
 
 
 ;;; Core Functions
@@ -212,20 +217,26 @@ If NO-COLOR is non-nil, strip ANSI color codes."
 
 
 
-;;; Vterm Integration
+;;; Terminal Integration
 
 (declare-function vterm "vterm")
 (declare-function vterm-send-string "vterm")
 (declare-function vterm-send-return "vterm")
 
-;;;###autoload
-(defun tuiw-attach (session-id)
+(defun tuiw-attach--vterm (session-id)
   "Attach to tuiw SESSION-ID using vterm."
-  (interactive
-   (list (completing-read "Session: " (tuiw-list-session-ids) nil t)))
   (vterm (format "*tuiw-vterm:%s*" session-id))
   (vterm-send-string (format "exec tmux attach -t tuiw-%s" session-id))
   (vterm-send-return))
+
+;;;###autoload
+(defun tuiw-attach (session-id)
+  "Attach to tuiw SESSION-ID using terminal backend."
+  (interactive
+   (list (completing-read "Session: " (tuiw-list-session-ids) nil t)))
+  (pcase tuiw-terminal-backend
+    ('vterm (tuiw-attach--vterm session-id))
+    (_ (error "Unknown terminal backend: %s" tuiw-terminal-backend))))
 
 (provide 'tuiw)
 
