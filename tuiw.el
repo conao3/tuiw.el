@@ -1,0 +1,193 @@
+;;; tuiw.el --- Integration for tuiw  -*- lexical-binding: t; -*-
+
+;; Copyright (C) 2024  Naoya Yamashita
+
+;; Author: Naoya Yamashita <conao3@gmail.com>
+;; Version: 0.0.1
+;; Keywords: convenience
+;; Package-Requires: ((emacs "26.1"))
+;; URL: https://github.com/conao3/tuiw.el
+
+;; This program is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
+;; tuiw integration.
+
+
+;;; Code:
+
+(defgroup tuiw nil
+  "Integration for tuiw."
+  :group 'convenience
+  :link '(url-link :tag "Github" "https://github.com/conao3/tuiw.el"))
+
+(defcustom tuiw-executable "tuiw"
+  "Path to tuiw executable."
+  :type 'string
+  :group 'tuiw)
+
+(defun tuiw--call (&rest args)
+  "Call tuiw with ARGS and return output as string."
+  (with-temp-buffer
+    (apply #'call-process tuiw-executable nil t nil args)
+    (buffer-string)))
+
+(defun tuiw-create (command &optional cwd)
+  "Create a new tuiw session running COMMAND.
+Optional CWD specifies the working directory.
+Return session ID."
+  (string-trim
+   (if cwd
+       (tuiw--call "create" "--cwd" cwd command)
+     (tuiw--call "create" command))))
+
+(defun tuiw-send (session-id keys &optional no-newline)
+  "Send KEYS to SESSION-ID.
+If NO-NEWLINE is non-nil, do not append newline."
+  (if no-newline
+      (tuiw--call "send" "--no-newline" session-id keys)
+    (tuiw--call "send" session-id keys)))
+
+(defun tuiw-list ()
+  "List all tuiw sessions.
+Return list of (session-id command cwd)."
+  (let ((output (string-trim (tuiw--call "list"))))
+    (when (not (string-empty-p output))
+      (mapcar (lambda (line) (split-string line "\t"))
+              (split-string output "\n")))))
+
+(defun tuiw-list-session-ids ()
+  "List all tuiw session IDs."
+  (mapcar #'car (tuiw-list)))
+
+(defun tuiw-view (session-id &optional no-color)
+  "View output of SESSION-ID.
+If NO-COLOR is non-nil, strip ANSI color codes."
+  (if no-color
+      (tuiw--call "view" "--no-color" session-id)
+    (tuiw--call "view" session-id)))
+
+(defun tuiw-status (session-id)
+  "Get status of SESSION-ID."
+  (string-trim (tuiw--call "status" session-id)))
+
+(defun tuiw-close (session-id)
+  "Close SESSION-ID."
+  (tuiw--call "close" session-id))
+
+;;;###autoload
+(defun tuiw-run (command)
+  "Run COMMAND in a new tuiw session interactively."
+  (interactive "sCommand: ")
+  (let ((session-id (tuiw-create command)))
+    (message "Created tuiw session: %s" session-id)
+    session-id))
+
+;;;###autoload
+(defun tuiw-show (session-id)
+  "Show output of SESSION-ID in a buffer."
+  (interactive
+   (list (completing-read "Session: " (tuiw-list-session-ids) nil t)))
+  (let ((buf (get-buffer-create (format "*tuiw:%s*" session-id))))
+    (with-current-buffer buf
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert (tuiw-view session-id t))
+        (goto-char (point-min))))
+    (display-buffer buf)))
+
+;;;###autoload
+(defun tuiw-send-to-session (session-id keys)
+  "Send KEYS to SESSION-ID interactively."
+  (interactive
+   (list (completing-read "Session: " (tuiw-list-session-ids) nil t)
+         (read-string "Keys: ")))
+  (tuiw-send session-id keys)
+  (message "Sent keys to %s" session-id))
+
+;;;###autoload
+(defun tuiw-close-session (session-id)
+  "Close SESSION-ID interactively."
+  (interactive
+   (list (completing-read "Session: " (tuiw-list-session-ids) nil t)))
+  (tuiw-close session-id)
+  (message "Closed session: %s" session-id))
+
+(defvar tuiw-list-session-mode-map
+  (let ((map (make-sparse-keymap)))
+    (set-keymap-parent map tabulated-list-mode-map)
+    (define-key map (kbd "RET") #'tuiw-list-session-show)
+    (define-key map (kbd "s") #'tuiw-list-session-send)
+    (define-key map (kbd "d") #'tuiw-list-session-close)
+    (define-key map (kbd "g") #'tuiw-list-session-refresh)
+    map))
+
+(define-derived-mode tuiw-list-session-mode tabulated-list-mode "Tuiw-List"
+  "Major mode for listing tuiw sessions."
+  (setq tabulated-list-format [("ID" 10 t)
+                               ("Command" 40 t)
+                               ("Directory" 40 t)])
+  (setq tabulated-list-padding 2)
+  (tabulated-list-init-header))
+
+(defun tuiw-list-session-refresh ()
+  "Refresh tuiw session list."
+  (interactive)
+  (setq tabulated-list-entries
+        (mapcar (lambda (entry)
+                  (list (car entry)
+                        (vector (nth 0 entry)
+                                (or (nth 1 entry) "")
+                                (or (nth 2 entry) ""))))
+                (tuiw-list)))
+  (tabulated-list-print t))
+
+(defun tuiw-list-session--get-id ()
+  "Get session ID at point."
+  (tabulated-list-get-id))
+
+(defun tuiw-list-session-show ()
+  "Show output of session at point."
+  (interactive)
+  (when-let ((id (tuiw-list-session--get-id)))
+    (tuiw-show id)))
+
+(defun tuiw-list-session-send (keys)
+  "Send KEYS to session at point."
+  (interactive "sKeys: ")
+  (when-let ((id (tuiw-list-session--get-id)))
+    (tuiw-send id keys)
+    (message "Sent keys to %s" id)))
+
+(defun tuiw-list-session-close ()
+  "Close session at point."
+  (interactive)
+  (when-let ((id (tuiw-list-session--get-id)))
+    (tuiw-close id)
+    (tuiw-list-session-refresh)))
+
+;;;###autoload
+(defun tuiw-list-sessions ()
+  "Display tuiw sessions in a tabulated list."
+  (interactive)
+  (let ((buf (get-buffer-create "*tuiw-sessions*")))
+    (with-current-buffer buf
+      (tuiw-list-session-mode)
+      (tuiw-list-session-refresh))
+    (pop-to-buffer buf)))
+
+(provide 'tuiw)
+
+;;; tuiw.el ends here

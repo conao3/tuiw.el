@@ -1,0 +1,9 @@
+;; Keg
+
+(source gnu melpa)
+
+(package
+ (tuiw
+  (recipe . (tuiw :fetcher github :repo "conao3/tuiw.el"))))
+
+(dev-dependency cort)
