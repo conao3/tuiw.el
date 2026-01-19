@@ -173,7 +173,7 @@ If NO-COLOR is non-nil, strip ANSI color codes."
   (interactive)
   (let ((content (buffer-string))
         (session-id tuiw-send-with-temp-buffer--session-id))
-    (tuiw--send session-id content t)
+    (tuiw--send session-id content)
     (message "Sent to %s" session-id)
     (quit-window t)))
 
