@@ -28,6 +28,9 @@
 
 ;;; Code:
 
+
+;;; Customization
+
 (defgroup tuiw nil
   "Integration for tuiw."
   :group 'convenience
@@ -37,6 +40,10 @@
   "Path to tuiw executable."
   :type 'string
   :group 'tuiw)
+
+
+
+;;; Core Functions
 
 (defun tuiw--call (&rest args)
   "Call tuiw with ARGS and return output as string."
@@ -87,6 +94,10 @@ If NO-COLOR is non-nil, strip ANSI color codes."
   "Close SESSION-ID."
   (tuiw--call "close" session-id))
 
+
+
+;;; Interactive Commands
+
 ;;;###autoload
 (defun tuiw-run (command)
   "Run COMMAND in a new tuiw session interactively."
@@ -125,6 +136,10 @@ If NO-COLOR is non-nil, strip ANSI color codes."
   (tuiw-close session-id)
   (message "Closed session: %s" session-id))
 
+
+
+;;; List Session Mode
+
 (defvar tuiw-list-session-mode-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map tabulated-list-mode-map)
@@ -132,6 +147,7 @@ If NO-COLOR is non-nil, strip ANSI color codes."
     (define-key map (kbd "s") #'tuiw-list-session-send)
     (define-key map (kbd "d") #'tuiw-list-session-close)
     (define-key map (kbd "g") #'tuiw-list-session-refresh)
+    (define-key map (kbd "a") #'tuiw-list-session-attach)
     map))
 
 (define-derived-mode tuiw-list-session-mode tabulated-list-mode "Tuiw-List"
@@ -178,6 +194,12 @@ If NO-COLOR is non-nil, strip ANSI color codes."
     (tuiw-close id)
     (tuiw-list-session-refresh)))
 
+(defun tuiw-list-session-attach ()
+  "Attach to session at point using vterm."
+  (interactive)
+  (when-let ((id (tuiw-list-session--get-id)))
+    (tuiw-attach id)))
+
 ;;;###autoload
 (defun tuiw-list-sessions ()
   "Display tuiw sessions in a tabulated list."
@@ -187,6 +209,23 @@ If NO-COLOR is non-nil, strip ANSI color codes."
       (tuiw-list-session-mode)
       (tuiw-list-session-refresh))
     (pop-to-buffer buf)))
+
+
+
+;;; Vterm Integration
+
+(declare-function vterm "vterm")
+(declare-function vterm-send-string "vterm")
+(declare-function vterm-send-return "vterm")
+
+;;;###autoload
+(defun tuiw-attach (session-id)
+  "Attach to tuiw SESSION-ID using vterm."
+  (interactive
+   (list (completing-read "Session: " (tuiw-list-session-ids) nil t)))
+  (vterm (format "*tuiw-vterm:%s*" session-id))
+  (vterm-send-string (format "exec tmux attach -t tuiw-%s" session-id))
+  (vterm-send-return))
 
 (provide 'tuiw)
 
