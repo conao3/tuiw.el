@@ -84,6 +84,18 @@ Return list of (session-id command cwd)."
   "List all tuiw session IDs."
   (mapcar #'car (tuiw-list)))
 
+(defun tuiw--read-session (prompt)
+  "Read a session ID with PROMPT using completion with annotations."
+  (let* ((sessions (tuiw-list))
+         (annotate (lambda (id)
+                     (when-let ((entry (assoc id sessions)))
+                       (format "  %s [%s]" (nth 1 entry) (nth 2 entry)))))
+         (table (lambda (string pred action)
+                  (if (eq action 'metadata)
+                      `(metadata (annotation-function . ,annotate))
+                    (complete-with-action action (mapcar #'car sessions) string pred)))))
+    (completing-read prompt table nil t)))
+
 (defun tuiw-view (session-id &optional no-color)
   "View output of SESSION-ID.
 If NO-COLOR is non-nil, strip ANSI color codes."
@@ -114,8 +126,7 @@ If NO-COLOR is non-nil, strip ANSI color codes."
 ;;;###autoload
 (defun tuiw-show (session-id)
   "Show output of SESSION-ID in a buffer."
-  (interactive
-   (list (completing-read "Session: " (tuiw-list-session-ids) nil t)))
+  (interactive (list (tuiw--read-session "Session: ")))
   (let ((buf (get-buffer-create (format "*tuiw:%s*" session-id))))
     (with-current-buffer buf
       (let ((inhibit-read-only t))
@@ -128,7 +139,7 @@ If NO-COLOR is non-nil, strip ANSI color codes."
 (defun tuiw-send-to-session (session-id keys)
   "Send KEYS to SESSION-ID interactively."
   (interactive
-   (list (completing-read "Session: " (tuiw-list-session-ids) nil t)
+   (list (tuiw--read-session "Session: ")
          (read-string "Keys: ")))
   (tuiw-send session-id keys)
   (message "Sent keys to %s" session-id))
@@ -136,8 +147,7 @@ If NO-COLOR is non-nil, strip ANSI color codes."
 ;;;###autoload
 (defun tuiw-close-session (session-id)
   "Close SESSION-ID interactively."
-  (interactive
-   (list (completing-read "Session: " (tuiw-list-session-ids) nil t)))
+  (interactive (list (tuiw--read-session "Session: ")))
   (tuiw-close session-id)
   (message "Closed session: %s" session-id))
 
@@ -232,8 +242,7 @@ If NO-COLOR is non-nil, strip ANSI color codes."
 ;;;###autoload
 (defun tuiw-attach (session-id)
   "Attach to tuiw SESSION-ID using terminal backend."
-  (interactive
-   (list (completing-read "Session: " (tuiw-list-session-ids) nil t)))
+  (interactive (list (tuiw--read-session "Session: ")))
   (pcase tuiw-terminal-backend
     ('vterm (tuiw-attach--vterm session-id))
     (_ (error "Unknown terminal backend: %s" tuiw-terminal-backend))))
