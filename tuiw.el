@@ -46,6 +46,11 @@
   :type '(choice (const :tag "vterm" vterm))
   :group 'tuiw)
 
+(defcustom tuiw-view-ansi-color t
+  "If non-nil, apply ANSI color codes in tuiw-view buffer."
+  :type 'boolean
+  :group 'tuiw)
+
 
 
 ;;; Core Functions
@@ -115,6 +120,8 @@ If NO-COLOR is non-nil, strip ANSI color codes."
 
 ;;; Interactive Commands
 
+(declare-function ansi-color-apply-on-region "ansi-color")
+
 ;;;###autoload
 (defun tuiw-create (command)
   "Run COMMAND in a new tuiw session interactively."
@@ -131,7 +138,10 @@ If NO-COLOR is non-nil, strip ANSI color codes."
     (with-current-buffer buf
       (let ((inhibit-read-only t))
         (erase-buffer)
-        (insert (tuiw--view session-id t))
+        (insert (tuiw--view session-id (not tuiw-view-ansi-color)))
+        (when tuiw-view-ansi-color
+          (require 'ansi-color)
+          (ansi-color-apply-on-region (point-min) (point-max)))
         (goto-char (point-min)))
       (special-mode))
     (display-buffer buf)))
