@@ -47,7 +47,7 @@
   :group 'tuiw)
 
 (defcustom tuiw-view-ansi-color t
-  "If non-nil, apply ANSI color codes in tuiw-view buffer."
+  "If non-nil, apply ANSI color codes in `tuiw-view' buffer."
   :type 'boolean
   :group 'tuiw)
 
