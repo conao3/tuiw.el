@@ -123,10 +123,14 @@ If NO-COLOR is non-nil, strip ANSI color codes."
 (declare-function ansi-color-apply-on-region "ansi-color")
 
 ;;;###autoload
-(defun tuiw-create (command)
-  "Run COMMAND in a new tuiw session interactively."
-  (interactive "sCommand: ")
-  (let ((session-id (tuiw--create command)))
+(defun tuiw-create (command &optional cwd)
+  "Run COMMAND in a new tuiw session interactively.
+With prefix argument, prompt for working directory CWD."
+  (interactive
+   (list (read-string "Command: ")
+         (when current-prefix-arg
+           (read-directory-name "Directory: "))))
+  (let ((session-id (tuiw--create command cwd)))
     (message "Created tuiw session: %s" session-id)
     session-id))
 
