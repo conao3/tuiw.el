@@ -108,10 +108,6 @@ If NO-COLOR is non-nil, strip ANSI color codes."
       (tuiw--call "view" "--no-color" session-id)
     (tuiw--call "view" session-id)))
 
-(defun tuiw--status (session-id)
-  "Get status of SESSION-ID."
-  (string-trim (tuiw--call "status" session-id)))
-
 (defun tuiw--close (session-id)
   "Close SESSION-ID."
   (tuiw--call "close" session-id))
