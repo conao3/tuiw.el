@@ -51,6 +51,12 @@
   :type 'boolean
   :group 'tuiw)
 
+(defcustom tuiw-send-separator ";; --- >8 ---"
+  "Separator line for `tuiw-send-with-temp-buffer'.
+Only text below this line will be sent to the session."
+  :type 'string
+  :group 'tuiw)
+
 
 
 ;;; Core Functions
@@ -185,7 +191,13 @@ With prefix argument, prompt for working directory CWD."
 (defun tuiw-send-with-temp-buffer-commit ()
   "Send buffer contents to the tuiw session."
   (interactive)
-  (let ((content (buffer-string))
+  (let ((content (save-excursion
+                   (goto-char (point-min))
+                   (if (re-search-forward (concat "^" (regexp-quote tuiw-send-separator) "$") nil t)
+                       (progn
+                         (forward-line 1)
+                         (buffer-substring-no-properties (point) (point-max)))
+                     (buffer-string))))
         (session-id tuiw-send-with-temp-buffer--session-id))
     (tuiw--send session-id content)
     (message "Sent to %s" session-id)
@@ -200,11 +212,22 @@ With prefix argument, prompt for working directory CWD."
 (defun tuiw-send-with-temp-buffer (session-id)
   "Open a buffer to compose text to send to SESSION-ID."
   (interactive (list (tuiw--read-session "Session: ")))
-  (let ((buf (get-buffer-create (format "*tuiw--send:%s*" session-id))))
+  (let ((buf (get-buffer-create (format "*tuiw--send:%s*" session-id)))
+        (view (tuiw--view session-id (not tuiw-view-ansi-color))))
     (with-current-buffer buf
       (tuiw-send-with-temp-buffer-mode)
       (setq tuiw-send-with-temp-buffer--session-id session-id)
-      (erase-buffer))
+      (erase-buffer)
+      (let ((inhibit-read-only t))
+        (insert view)
+        (when tuiw-view-ansi-color
+          (require 'ansi-color)
+          (ansi-color-apply-on-region (point-min) (point-max)))
+        (goto-char (point-max))
+        (insert "\n" tuiw-send-separator "\n")
+        (add-text-properties (point-min) (1- (point))
+                             '(read-only t front-sticky (read-only) rear-nonsticky (read-only))))
+      (set-buffer-modified-p nil))
     (pop-to-buffer buf)))
 
 
