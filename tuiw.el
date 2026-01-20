@@ -177,7 +177,10 @@ With prefix argument, prompt for working directory CWD."
 (define-derived-mode tuiw-send-with-temp-buffer-mode text-mode "Tuiw-Send"
   "Mode for composing text to send to tuiw session.
 \\<tuiw-send-with-temp-buffer-mode-map>
-\\[tuiw-send-with-temp-buffer-commit] to send, \\[tuiw-send-with-temp-buffer-cancel] to cancel.")
+\\[tuiw-send-with-temp-buffer-commit] to send, \\[tuiw-send-with-temp-buffer-cancel] to cancel."
+  (setq-local header-line-format
+              (substitute-command-keys
+               "Compose text to send. \\[tuiw-send-with-temp-buffer-commit] to send, \\[tuiw-send-with-temp-buffer-cancel] to cancel")))
 
 (defun tuiw-send-with-temp-buffer-commit ()
   "Send buffer contents to the tuiw session."
