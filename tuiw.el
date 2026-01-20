@@ -212,6 +212,7 @@ With prefix argument, prompt for working directory CWD."
     (set-keymap-parent map tabulated-list-mode-map)
     (define-key map (kbd "RET") #'tuiw-list-show)
     (define-key map (kbd "s") #'tuiw-list-send)
+    (define-key map (kbd "i") #'tuiw-list-send-with-temp-buffer)
     (define-key map (kbd "d") #'tuiw-list-close)
     (define-key map (kbd "g") #'tuiw-list-refresh)
     (define-key map (kbd "a") #'tuiw-list-attach)
@@ -253,6 +254,12 @@ With prefix argument, prompt for working directory CWD."
   (when-let ((id (tuiw-list--get-id)))
     (tuiw--send id keys)
     (message "Sent keys to %s" id)))
+
+(defun tuiw-list-send-with-temp-buffer ()
+  "Open a buffer to compose text to send to session at point."
+  (interactive)
+  (when-let ((id (tuiw-list--get-id)))
+    (tuiw-send-with-temp-buffer id)))
 
 (defun tuiw-list-close ()
   "Close session at point."
