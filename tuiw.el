@@ -28,6 +28,9 @@
 
 ;;; Code:
 
+(require 'json)
+(require 'subr-x)
+
 
 ;;; Customization
 
@@ -62,34 +65,46 @@ Only text below this line will be sent to the session."
 ;;; Core Functions
 
 (defun tuiw--call (&rest args)
-  "Call tuiw with ARGS and return output as string."
+  "Call tuiw with ARGS and return output as string.
+Signal an error when tuiw exits with a non-zero status."
   (with-temp-buffer
-    (apply #'call-process tuiw-executable nil t nil args)
-    (buffer-string)))
+    (let ((status (apply #'call-process tuiw-executable nil t nil args)))
+      (unless (eq status 0)
+        (error "Tuiw %s failed (%s): %s"
+               (string-join args " ") status (string-trim (buffer-string))))
+      (buffer-string))))
+
+(defun tuiw--call-json (&rest args)
+  "Call tuiw with ARGS and return its JSON output as an alist.
+Keys are the PascalCase output keys of tuiw as strings."
+  (let ((json-object-type 'alist)
+        (json-array-type 'list)
+        (json-key-type 'string))
+    (json-read-from-string (apply #'tuiw--call args))))
 
 (defun tuiw--create (command &optional cwd)
   "Create a new tuiw session running COMMAND.
 Optional CWD specifies the working directory.
 Return session ID."
-  (string-trim
-   (if cwd
-       (tuiw--call "create" "--cwd" cwd command)
-     (tuiw--call "create" command))))
+  (cdr (assoc "SessionId"
+              (apply #'tuiw--call-json
+                     "session" "create-session" "--command" command
+                     (when cwd (list "--cwd" cwd))))))
 
 (defun tuiw--send (session-id keys &optional no-newline)
   "Send KEYS to SESSION-ID.
 If NO-NEWLINE is non-nil, do not append newline."
-  (if no-newline
-      (tuiw--call "send" "--no-newline" session-id keys)
-    (tuiw--call "send" session-id keys)))
+  (tuiw--call "session" "send-keys" "--session-id" session-id "--keys" keys
+              (if no-newline "--no-newline" "--newline")))
 
 (defun tuiw--list ()
   "List all tuiw sessions.
 Return list of (session-id command cwd)."
-  (let ((output (string-trim (tuiw--call "list"))))
-    (when (not (string-empty-p output))
-      (mapcar (lambda (line) (split-string line "\t"))
-              (split-string output "\n")))))
+  (mapcar (lambda (session)
+            (list (cdr (assoc "SessionId" session))
+                  (cdr (assoc "Command" session))
+                  (cdr (assoc "Cwd" session))))
+          (cdr (assoc "Sessions" (tuiw--call-json "session" "list-sessions")))))
 
 (defun tuiw--list-session-ids ()
   "List all tuiw session IDs."
@@ -110,13 +125,13 @@ Return list of (session-id command cwd)."
 (defun tuiw--view (session-id &optional no-color)
   "View output of SESSION-ID.
 If NO-COLOR is non-nil, strip ANSI color codes."
-  (if no-color
-      (tuiw--call "view" "--no-color" session-id)
-    (tuiw--call "view" session-id)))
+  (cdr (assoc "Screen"
+              (tuiw--call-json "session" "get-screen" "--session-id" session-id
+                               (if no-color "--no-color" "--color")))))
 
 (defun tuiw--close (session-id)
   "Close SESSION-ID."
-  (tuiw--call "close" session-id))
+  (tuiw--call "session" "delete-session" "--session-id" session-id))
 
 
 

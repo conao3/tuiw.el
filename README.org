@@ -36,6 +36,13 @@ Sample install code using [[https://github.com/conao3/leaf.el][leaf.el]].
 #+end_src
 
 * Usage
+tuiw.el calls the [[https://github.com/conao3/rust-tuiw][tuiw]] CLI that takes the AWS CLI style grammar and prints JSON (=tuiw session create-session --command ...=, =session list-sessions=, =session send-keys --session-id ... --keys ...=, =session get-screen --session-id ...=, =session delete-session --session-id ...=).
+
+- =M-x tuiw-create= :: Run a command in a new session (=C-u= to choose the working directory).
+- =M-x tuiw-list= :: List sessions. =RET= shows the screen, =s= sends keys, =i= composes text in a buffer, =d= closes, =g= refreshes, =a= attaches with vterm.
+- =M-x tuiw-view=, =M-x tuiw-send=, =M-x tuiw-send-with-temp-buffer=, =M-x tuiw-close=, =M-x tuiw-attach= :: Operate on a session chosen with completion.
+
+A failing tuiw call (non-zero exit, e.g. 254 for a missing session) signals an error with the tuiw message.
 
 * Customize
 
